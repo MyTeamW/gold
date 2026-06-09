@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>黄金助手</title>
+    <link rel="stylesheet" href="./styles.css?v=20260609-1" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar" aria-label="黄金助手">
+        <div>
+          <p class="eyebrow">Gold Tracker</p>
+          <h1>黄金助手</h1>
+        </div>
+        <div class="meta">
+          <span id="clockText">--</span>
+          <span id="updateStatus">数据已准备</span>
+          <button id="refreshButton" class="icon-button" type="button" title="刷新数据">
+            <span aria-hidden="true">↻</span>
+            <span class="sr-only">刷新数据</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="market-grid" aria-label="今日行情">
+        <article class="panel market-panel">
+          <div class="panel-head">
+            <div>
+              <h2>今日国内黄金行情</h2>
+              <p>上海黄金交易所 Au99.99</p>
+            </div>
+            <span id="goldQuoteDate" class="quote-date">--</span>
+          </div>
+          <div class="quote-main">
+            <div>
+              <span class="quote-label">现价</span>
+              <strong id="goldPrice">--</strong>
+              <span class="unit">元/克</span>
+            </div>
+            <span id="goldChange" class="change-chip neutral">--</span>
+          </div>
+          <dl class="quote-stats">
+            <div>
+              <dt>今日高</dt>
+              <dd id="goldHigh">--</dd>
+            </div>
+            <div>
+              <dt>今日低</dt>
+              <dd id="goldLow">--</dd>
+            </div>
+            <div>
+              <dt>昨收</dt>
+              <dd id="goldPrev">--</dd>
+            </div>
+            <div>
+              <dt>更新时间</dt>
+              <dd id="goldUpdated">--</dd>
+            </div>
+          </dl>
+          <div id="goldNote" class="market-note" hidden></div>
+        </article>
+
+        <article class="panel market-panel">
+          <div class="panel-head">
+            <div>
+              <h2>中银上海金ETF联接C</h2>
+              <p>009478</p>
+            </div>
+            <a class="source-link" href="https://fund.eastmoney.com/009478.html" target="_blank" rel="noopener noreferrer">
+              基金页
+            </a>
+          </div>
+          <div class="quote-main">
+            <div>
+              <span class="quote-label">单位净值</span>
+              <strong id="fundNav">--</strong>
+            </div>
+            <span id="fundChange" class="change-chip neutral">--</span>
+          </div>
+          <dl class="quote-stats">
+            <div>
+              <dt>估算净值</dt>
+              <dd id="fundEstimate">--</dd>
+            </div>
+            <div>
+              <dt>净值日期</dt>
+              <dd id="fundDate">--</dd>
+            </div>
+            <div>
+              <dt>估算时间</dt>
+              <dd id="fundEstimateTime">--</dd>
+            </div>
+            <div>
+              <dt>更新时间</dt>
+              <dd id="fundUpdated">--</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="portfolio-grid" aria-label="持仓和定投">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>我的持仓情况</h2>
+              <p>收益按 Au99.99 当前价估算</p>
+            </div>
+            <button id="saveHoldingButton" class="primary" type="button">保存持仓</button>
+          </div>
+
+          <form id="holdingForm" class="form-grid">
+            <label>
+              <span>持有克数</span>
+              <input id="holdingGramsInput" type="number" min="0" step="0.0001" inputmode="decimal" placeholder="0.0000" />
+            </label>
+            <label>
+              <span>成本金额</span>
+              <input id="costAmountInput" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+            </label>
+          </form>
+
+          <dl class="metric-grid">
+            <div>
+              <dt>持有金额</dt>
+              <dd id="holdingAmount">--</dd>
+            </div>
+            <div>
+              <dt>持有克数</dt>
+              <dd id="holdingGrams">--</dd>
+            </div>
+            <div>
+              <dt>昨日收益</dt>
+              <dd id="dailyProfit">--</dd>
+            </div>
+            <div>
+              <dt>持有收益</dt>
+              <dd id="holdingProfit">--</dd>
+            </div>
+            <div>
+              <dt>持有收益率</dt>
+              <dd id="holdingYield">--</dd>
+            </div>
+            <div>
+              <dt>成本价</dt>
+              <dd id="costPrice">--</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>定投情况</h2>
+              <p>按今日金价估算可买克数</p>
+            </div>
+            <button id="savePlanButton" class="primary" type="button">保存定投</button>
+          </div>
+
+          <form id="planForm" class="form-grid">
+            <label>
+              <span>定投金额</span>
+              <input id="planAmountInput" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+            </label>
+            <label>
+              <span>定投频率</span>
+              <select id="planFrequencyInput">
+                <option value="weekly">每周</option>
+                <option value="biweekly">每两周</option>
+                <option value="monthly">每月</option>
+              </select>
+            </label>
+          </form>
+
+          <dl class="plan-summary">
+            <div>
+              <dt>定投金额</dt>
+              <dd id="planAmount">--</dd>
+            </div>
+            <div>
+              <dt>定投频率</dt>
+              <dd id="planFrequency">--</dd>
+            </div>
+            <div>
+              <dt>单次约买入</dt>
+              <dd id="planEstimatedGrams">--</dd>
+            </div>
+            <div>
+              <dt>月度预算</dt>
+              <dd id="planMonthlyBudget">--</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="panel advice-panel" aria-labelledby="adviceTitle">
+        <div class="panel-head">
+          <div>
+            <h2 id="adviceTitle">今日操作建议</h2>
+            <p id="adviceGenerated">等待 Codex 自动化写入</p>
+          </div>
+          <span id="adviceTradeDate" class="quote-date">--</span>
+        </div>
+
+        <div id="adviceContent" class="advice-content">
+          暂无今日操作建议。定时 Codex 自动化运行后，这里会显示结合今日行情、持仓和定投情况生成的建议。
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js?v=20260609-1"></script>
+  </body>
+</html>

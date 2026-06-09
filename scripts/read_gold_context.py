@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import time
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -23,6 +24,7 @@ GOLD_ROW_KEY = env_or("GOLD_ROW_KEY", "gold")
 FUND_CODE = env_or("GOLD_FUND_CODE", "009478")
 PAGE_URL = "https://myteamw.github.io/gold/"
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
+PROXY_ENV_KEYS = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy")
 
 
 DEFAULT_STATE = {
@@ -49,6 +51,47 @@ def number_or_none(value: Any) -> float | None:
 def clean_number(value: Any) -> float | None:
   number = number_or_none(value)
   return number if number is not None and number > 0 else None
+
+
+@contextmanager
+def direct_sge_network():
+  previous = {key: os.environ.get(key) for key in PROXY_ENV_KEYS}
+  previous_no_proxy = os.environ.get("NO_PROXY")
+  previous_no_proxy_lower = os.environ.get("no_proxy")
+  try:
+    for key in PROXY_ENV_KEYS:
+      os.environ.pop(key, None)
+    no_proxy_hosts = "www.sge.com.cn,sge.com.cn"
+    os.environ["NO_PROXY"] = no_proxy_hosts
+    os.environ["no_proxy"] = no_proxy_hosts
+    yield
+  finally:
+    for key, value in previous.items():
+      if value is None:
+        os.environ.pop(key, None)
+      else:
+        os.environ[key] = value
+    if previous_no_proxy is None:
+      os.environ.pop("NO_PROXY", None)
+    else:
+      os.environ["NO_PROXY"] = previous_no_proxy
+    if previous_no_proxy_lower is None:
+      os.environ.pop("no_proxy", None)
+    else:
+      os.environ["no_proxy"] = previous_no_proxy_lower
+
+
+def short_error(label: str, exc: Exception) -> str:
+  text = str(exc)
+  if "ProxyError" in text or "proxy" in text.lower() or "WinError 10061" in text:
+    return f"{label}暂时不可用：本机代理连接失败"
+  if "403" in text or "Forbidden" in text:
+    return f"{label}暂时不可用：官网拒绝本次请求"
+  if "Expecting value" in text:
+    return f"{label}暂时不可用：官网返回非行情数据"
+  if "timed out" in text.lower() or "timeout" in text.lower():
+    return f"{label}暂时不可用：请求超时"
+  return f"{label}暂时不可用"
 
 
 def request_json(url: str, *, method: str = "GET", body: Any = None, headers: dict[str, str] | None = None) -> Any:
@@ -129,19 +172,20 @@ def fetch_sge_quote(errors: list[str]) -> dict[str, Any]:
   try:
     import akshare as ak
 
-    try:
-      realtime_df = ak.spot_quotations_sge(symbol="Au99.99")
-      realtime_rows = json.loads(realtime_df.to_json(orient="records", force_ascii=False, date_format="iso"))
-    except Exception as exc:
-      errors.append(f"SGE realtime: {exc}")
+    with direct_sge_network():
+      try:
+        realtime_df = ak.spot_quotations_sge(symbol="Au99.99")
+        realtime_rows = json.loads(realtime_df.to_json(orient="records", force_ascii=False, date_format="iso"))
+      except Exception as exc:
+        errors.append(short_error("上金所实时行情", exc))
 
-    try:
-      hist_df = ak.spot_hist_sge(symbol="Au99.99")
-      hist_rows = json.loads(hist_df.to_json(orient="records", force_ascii=False, date_format="iso"))
-    except Exception as exc:
-      errors.append(f"SGE history: {exc}")
+      try:
+        hist_df = ak.spot_hist_sge(symbol="Au99.99")
+        hist_rows = json.loads(hist_df.to_json(orient="records", force_ascii=False, date_format="iso"))
+      except Exception as exc:
+        errors.append(short_error("上金所历史行情", exc))
   except Exception as exc:
-    errors.append(f"akshare import: {exc}")
+    errors.append(short_error("黄金行情组件", exc))
 
   now = now_china()
   prices = [clean_number(row.get("现价")) for row in realtime_rows]
@@ -267,14 +311,17 @@ def refresh_market(state: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
   try:
     market["gold"] = fetch_sge_quote(errors)
   except Exception as exc:
-    errors.append(str(exc))
+    if isinstance(market.get("gold"), dict):
+      errors.append("上金所行情暂时不可用，已保留上次黄金行情")
+    else:
+      errors.append(short_error("上金所行情", exc))
 
   try:
     market["fund"] = fetch_fund_quote()
   except (HTTPError, URLError, TimeoutError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
-    errors.append(f"fund {FUND_CODE}: {exc}")
+    errors.append(short_error(f"基金 {FUND_CODE} 行情", exc))
 
-  market["quoteErrors"] = errors
+  market["quoteErrors"] = list(dict.fromkeys(errors))
   market["refreshedAt"] = now_china().isoformat()
   state["market"] = market
   return state, errors

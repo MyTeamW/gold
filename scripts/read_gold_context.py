@@ -195,18 +195,69 @@ def fetch_fund_quote() -> dict[str, Any]:
   nav = number_or_none(payload.get("dwjz"))
   estimated_nav = number_or_none(payload.get("gsz"))
   change_amount = estimated_nav - nav if estimated_nav is not None and nav is not None else None
+  change_percent = number_or_none(payload.get("gszzl"))
+  history = fetch_fund_history()
+  if history:
+    nav = history["nav"]
+    change_amount = history["change_amount"]
+    change_percent = history["change_percent"]
   return {
     "code": FUND_CODE,
     "name": payload.get("name") or "中银上海金ETF联接C",
     "nav": nav,
-    "nav_date": payload.get("jzrq") or "",
+    "nav_date": history.get("nav_date") if history else payload.get("jzrq") or "",
+    "previous_nav": history.get("previous_nav") if history else None,
+    "previous_nav_date": history.get("previous_nav_date") if history else "",
     "estimated_nav": estimated_nav,
     "change_amount": round(change_amount, 4) if change_amount is not None else None,
-    "change_percent": number_or_none(payload.get("gszzl")),
+    "change_percent": change_percent,
     "estimate_time": payload.get("gztime") or "",
     "refreshed_at": now_china().isoformat(),
     "source": "fundgz.1234567.com.cn",
   }
+
+
+def fund_trend_date(value: Any) -> str:
+  timestamp = number_or_none(value)
+  if timestamp is None:
+    return ""
+  return datetime.fromtimestamp(timestamp / 1000, CHINA_TZ).date().isoformat()
+
+
+def fetch_fund_history() -> dict[str, Any] | None:
+  try:
+    text = request_text(
+      f"https://fund.eastmoney.com/pingzhongdata/{FUND_CODE}.js?v={int(time.time() * 1000)}",
+      headers={"Referer": "https://fund.eastmoney.com/"},
+    )
+    match = re.search(r"var Data_netWorthTrend = (\[.*?\]);/\*累计净值走势", text, re.S)
+    if not match:
+      return None
+    rows = json.loads(match.group(1))
+    if not isinstance(rows, list) or len(rows) < 2:
+      return None
+    previous = rows[-2]
+    latest = rows[-1]
+    if not isinstance(previous, dict) or not isinstance(latest, dict):
+      return None
+    previous_nav = number_or_none(previous.get("y"))
+    latest_nav = number_or_none(latest.get("y"))
+    if previous_nav is None or latest_nav is None:
+      return None
+    change_amount = latest_nav - previous_nav
+    change_percent = number_or_none(latest.get("equityReturn"))
+    if change_percent is None and previous_nav:
+      change_percent = (change_amount / previous_nav) * 100
+    return {
+      "nav": latest_nav,
+      "nav_date": fund_trend_date(latest.get("x")),
+      "previous_nav": previous_nav,
+      "previous_nav_date": fund_trend_date(previous.get("x")),
+      "change_amount": change_amount,
+      "change_percent": change_percent,
+    }
+  except Exception:
+    return None
 
 
 def refresh_market(state: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:

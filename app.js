@@ -267,10 +267,12 @@ function currentGoldPrice() {
 }
 
 function fundComparison(fund) {
-  const previousNav = numberOrNull(fund && fund.nav);
+  const latestNav = numberOrNull(fund && fund.nav);
+  const baseNav = numberOrNull(fund && fund.previous_nav);
   const currentEstimate = numberOrNull(fund && fund.estimated_nav);
-  const currentValue = currentEstimate ?? previousNav;
   const storedAmount = numberOrNull(fund && fund.change_amount);
+  const previousNav = storedAmount !== null && baseNav !== null ? baseNav : latestNav;
+  const currentValue = storedAmount !== null && latestNav !== null ? latestNav : currentEstimate ?? latestNav;
   const storedPercent = numberOrNull(fund && fund.change_percent);
   const changeAmount =
     storedAmount ?? (currentValue !== null && previousNav !== null ? currentValue - previousNav : null);
@@ -469,22 +471,103 @@ async function loadFundEstimate() {
   });
 }
 
-function mergeFundEstimate(payload) {
-  if (!payload || typeof payload !== "object") return false;
-  const nav = numberOrNull(payload.dwjz);
-  const estimatedNav = numberOrNull(payload.gsz);
-  const changeAmount = nav !== null && estimatedNav !== null ? estimatedNav - nav : null;
+async function loadFundHistory() {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    const previousTrend = window.Data_netWorthTrend;
+    const cleanup = () => {
+      script.remove();
+      if (previousTrend === undefined) {
+        delete window.Data_netWorthTrend;
+      } else {
+        window.Data_netWorthTrend = previousTrend;
+      }
+    };
+
+    const timer = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("基金历史净值请求超时"));
+    }, 10000);
+
+    script.onload = () => {
+      window.clearTimeout(timer);
+      const trend = Array.isArray(window.Data_netWorthTrend) ? window.Data_netWorthTrend : [];
+      const result = trend.slice(-2).map((item) => ({
+        date: formatFundTrendDate(item.x),
+        nav: numberOrNull(item.y),
+        change_percent: numberOrNull(item.equityReturn),
+      }));
+      cleanup();
+      resolve(result);
+    };
+
+    script.onerror = () => {
+      window.clearTimeout(timer);
+      cleanup();
+      reject(new Error("基金历史净值请求失败"));
+    };
+    script.src = `https://fund.eastmoney.com/pingzhongdata/${FUND_CODE}.js?v=${Date.now()}`;
+    document.body.appendChild(script);
+  });
+}
+
+function formatFundTrendDate(value) {
+  const timestamp = numberOrNull(value);
+  if (timestamp === null) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+function mergeFundHistory(rows) {
+  if (!Array.isArray(rows) || rows.length < 2) return false;
+  const previous = rows[0] || {};
+  const latest = rows[1] || {};
+  const previousNav = numberOrNull(previous.nav);
+  const latestNav = numberOrNull(latest.nav);
+  if (previousNav === null || latestNav === null) return false;
+  const changeAmount = latestNav - previousNav;
+  const changePercent = numberOrNull(latest.change_percent) ?? (previousNav ? (changeAmount / previousNav) * 100 : null);
   state.data.market = {
     ...state.data.market,
     fund: {
       ...(state.data.market.fund || {}),
       code: FUND_CODE,
-      name: payload.name || "中银上海金ETF联接C",
-      nav,
-      nav_date: payload.jzrq || "",
-      estimated_nav: estimatedNav,
+      name: (state.data.market.fund && state.data.market.fund.name) || "中银上海金ETF联接C",
+      nav: latestNav,
+      nav_date: latest.date || "",
+      previous_nav: previousNav,
+      previous_nav_date: previous.date || "",
       change_amount: changeAmount,
-      change_percent: numberOrNull(payload.gszzl),
+      change_percent: changePercent,
+      refreshed_at: chinaNow().toISOString(),
+    },
+    refreshedAt: chinaNow().toISOString(),
+  };
+  return true;
+}
+
+function mergeFundEstimate(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  const nav = numberOrNull(payload.dwjz);
+  const estimatedNav = numberOrNull(payload.gsz);
+  const changeAmount = nav !== null && estimatedNav !== null ? estimatedNav - nav : null;
+  const existingFund = state.data.market.fund || {};
+  const hasHistoryMove = numberOrNull(existingFund.change_amount) !== null && numberOrNull(existingFund.change_percent) !== null;
+  state.data.market = {
+    ...state.data.market,
+    fund: {
+      ...existingFund,
+      code: FUND_CODE,
+      name: payload.name || "中银上海金ETF联接C",
+      nav: hasHistoryMove ? existingFund.nav : nav,
+      nav_date: hasHistoryMove ? existingFund.nav_date : payload.jzrq || "",
+      estimated_nav: estimatedNav,
+      change_amount: hasHistoryMove ? existingFund.change_amount : changeAmount,
+      change_percent: hasHistoryMove ? existingFund.change_percent : numberOrNull(payload.gszzl),
       estimate_time: payload.gztime || "",
       refreshed_at: chinaNow().toISOString(),
     },
@@ -497,6 +580,14 @@ async function refreshPageData() {
   setStatus("正在刷新...");
   try {
     await loadRemoteState();
+    try {
+      const fundHistory = await loadFundHistory();
+      if (mergeFundHistory(fundHistory)) {
+        await saveState("基金历史净值已刷新");
+      }
+    } catch (historyError) {
+      setStatus(`已读取远端，基金历史净值失败：${historyError.message}`);
+    }
     try {
       const fundPayload = await loadFundEstimate();
       if (mergeFundEstimate(fundPayload)) {

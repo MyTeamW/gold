@@ -192,12 +192,16 @@ def fetch_fund_quote() -> dict[str, Any]:
   if not match:
     raise RuntimeError("fund payload is not jsonpgz")
   payload = json.loads(match.group(1))
+  nav = number_or_none(payload.get("dwjz"))
+  estimated_nav = number_or_none(payload.get("gsz"))
+  change_amount = estimated_nav - nav if estimated_nav is not None and nav is not None else None
   return {
     "code": FUND_CODE,
     "name": payload.get("name") or "中银上海金ETF联接C",
-    "nav": number_or_none(payload.get("dwjz")),
+    "nav": nav,
     "nav_date": payload.get("jzrq") or "",
-    "estimated_nav": number_or_none(payload.get("gsz")),
+    "estimated_nav": estimated_nav,
+    "change_amount": round(change_amount, 4) if change_amount is not None else None,
     "change_percent": number_or_none(payload.get("gszzl")),
     "estimate_time": payload.get("gztime") or "",
     "refreshed_at": now_china().isoformat(),

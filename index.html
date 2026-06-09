@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>黄金助手</title>
-    <link rel="stylesheet" href="./styles.css?v=20260609-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260609-2" />
   </head>
   <body>
     <main class="shell">
@@ -73,15 +73,20 @@
           </div>
           <div class="quote-main">
             <div>
-              <span class="quote-label">单位净值</span>
-              <strong id="fundNav">--</strong>
+              <span class="quote-label">较昨日</span>
+              <strong id="fundDailyChange">--</strong>
+              <span class="unit">元</span>
             </div>
             <span id="fundChange" class="change-chip neutral">--</span>
           </div>
           <dl class="quote-stats">
             <div>
-              <dt>估算净值</dt>
+              <dt>当前估值</dt>
               <dd id="fundEstimate">--</dd>
+            </div>
+            <div>
+              <dt>昨日净值</dt>
+              <dd id="fundNav">--</dd>
             </div>
             <div>
               <dt>净值日期</dt>
@@ -90,10 +95,6 @@
             <div>
               <dt>估算时间</dt>
               <dd id="fundEstimateTime">--</dd>
-            </div>
-            <div>
-              <dt>更新时间</dt>
-              <dd id="fundUpdated">--</dd>
             </div>
           </dl>
         </article>
@@ -208,6 +209,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260609-1"></script>
+    <script src="./app.js?v=20260609-2"></script>
   </body>
 </html>

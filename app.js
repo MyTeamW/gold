@@ -42,12 +42,12 @@ const els = {
   goldPrev: document.querySelector("#goldPrev"),
   goldUpdated: document.querySelector("#goldUpdated"),
   goldNote: document.querySelector("#goldNote"),
+  fundDailyChange: document.querySelector("#fundDailyChange"),
   fundNav: document.querySelector("#fundNav"),
   fundChange: document.querySelector("#fundChange"),
   fundEstimate: document.querySelector("#fundEstimate"),
   fundDate: document.querySelector("#fundDate"),
   fundEstimateTime: document.querySelector("#fundEstimateTime"),
-  fundUpdated: document.querySelector("#fundUpdated"),
   holdingGramsInput: document.querySelector("#holdingGramsInput"),
   costAmountInput: document.querySelector("#costAmountInput"),
   saveHolding: document.querySelector("#saveHoldingButton"),
@@ -266,10 +266,24 @@ function currentGoldPrice() {
   return numberOrNull(state.data.market.gold && state.data.market.gold.price);
 }
 
+function fundComparison(fund) {
+  const previousNav = numberOrNull(fund && fund.nav);
+  const currentEstimate = numberOrNull(fund && fund.estimated_nav);
+  const currentValue = currentEstimate ?? previousNav;
+  const storedAmount = numberOrNull(fund && fund.change_amount);
+  const storedPercent = numberOrNull(fund && fund.change_percent);
+  const changeAmount =
+    storedAmount ?? (currentValue !== null && previousNav !== null ? currentValue - previousNav : null);
+  const changePercent =
+    storedPercent ?? (changeAmount !== null && previousNav ? (changeAmount / previousNav) * 100 : null);
+  return { currentValue, previousNav, changeAmount, changePercent };
+}
+
 function renderMarket() {
   const market = state.data.market || {};
   const gold = market.gold || {};
   const fund = market.fund || {};
+  const fundMove = fundComparison(fund);
 
   els.goldQuoteDate.textContent = gold.quote_date || "--";
   els.goldPrice.textContent = money(gold.price);
@@ -287,12 +301,17 @@ function renderMarket() {
     els.goldNote.textContent = "";
   }
 
-  els.fundNav.textContent = money(fund.nav, 4);
-  setChangeChip(els.fundChange, fund.change_percent);
-  els.fundEstimate.textContent = money(fund.estimated_nav, 4);
+  setSignedMetric(els.fundDailyChange, fundMove.changeAmount, (value) => {
+    const number = numberOrNull(value);
+    if (number === null) return "--";
+    const sign = number > 0 ? "+" : "";
+    return `${sign}${money(number, 4)}`;
+  });
+  setChangeChip(els.fundChange, fundMove.changePercent);
+  els.fundEstimate.textContent = money(fundMove.currentValue, 4);
+  els.fundNav.textContent = money(fundMove.previousNav, 4);
   els.fundDate.textContent = fund.nav_date || "--";
   els.fundEstimateTime.textContent = fund.estimate_time || "--";
-  els.fundUpdated.textContent = formatDateTime(fund.refreshed_at || market.refreshedAt);
 }
 
 function holdingMetrics() {
@@ -452,15 +471,19 @@ async function loadFundEstimate() {
 
 function mergeFundEstimate(payload) {
   if (!payload || typeof payload !== "object") return false;
+  const nav = numberOrNull(payload.dwjz);
+  const estimatedNav = numberOrNull(payload.gsz);
+  const changeAmount = nav !== null && estimatedNav !== null ? estimatedNav - nav : null;
   state.data.market = {
     ...state.data.market,
     fund: {
       ...(state.data.market.fund || {}),
       code: FUND_CODE,
       name: payload.name || "中银上海金ETF联接C",
-      nav: numberOrNull(payload.dwjz),
+      nav,
       nav_date: payload.jzrq || "",
-      estimated_nav: numberOrNull(payload.gsz),
+      estimated_nav: estimatedNav,
+      change_amount: changeAmount,
       change_percent: numberOrNull(payload.gszzl),
       estimate_time: payload.gztime || "",
       refreshed_at: chinaNow().toISOString(),

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>黄金助手</title>
-    <link rel="stylesheet" href="./styles.css?v=20260609-3" />
+    <link rel="stylesheet" href="./styles.css?v=20260610-1" />
   </head>
   <body>
     <main class="shell">
@@ -81,7 +81,7 @@
           </div>
           <dl class="quote-stats">
             <div>
-              <dt>当前估值</dt>
+              <dt>最新净值</dt>
               <dd id="fundEstimate">--</dd>
             </div>
             <div>
@@ -105,14 +105,14 @@
           <div class="panel-head">
             <div>
               <h2>我的持仓情况</h2>
-              <p>收益按 Au99.99 当前价估算</p>
+              <p>持仓为中银上海金ETF联接C</p>
             </div>
             <button id="saveHoldingButton" class="primary" type="button">保存持仓</button>
           </div>
 
           <form id="holdingForm" class="form-grid">
             <label>
-              <span>持有克数</span>
+              <span>持有份额</span>
               <input id="holdingGramsInput" type="number" min="0" step="0.0001" inputmode="decimal" placeholder="0.0000" />
             </label>
             <label>
@@ -127,7 +127,7 @@
               <dd id="holdingAmount">--</dd>
             </div>
             <div>
-              <dt>持有克数</dt>
+              <dt>持有份额</dt>
               <dd id="holdingGrams">--</dd>
             </div>
             <div>
@@ -143,7 +143,7 @@
               <dd id="holdingYield">--</dd>
             </div>
             <div>
-              <dt>成本价</dt>
+              <dt>成本净值</dt>
               <dd id="costPrice">--</dd>
             </div>
           </dl>
@@ -153,7 +153,7 @@
           <div class="panel-head">
             <div>
               <h2>定投情况</h2>
-              <p>按今日金价估算可买克数</p>
+              <p>按基金当前净值估算可买份额</p>
             </div>
             <button id="savePlanButton" class="primary" type="button">保存定投</button>
           </div>
@@ -209,6 +209,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260609-3"></script>
+    <script src="./app.js?v=20260610-1"></script>
   </body>
 </html>

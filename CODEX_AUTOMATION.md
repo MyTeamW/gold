@@ -14,7 +14,7 @@
 
    - `market`：黄金和基金行情快照。
    - `holding` / `holding_metrics`：我的持仓和收益估算。
-   - `plan` / `plan_metrics`：定投计划和估算买入克数。
+   - `plan` / `plan_metrics`：定投计划和估算买入份额。
    - `default_prompt`：给 Codex 的分析要求。
    - `write_result_schema`：写回结果需要遵守的 JSON 结构。
 
@@ -44,7 +44,7 @@
 
 ```text
 每个交易日 14:30 执行。进入 F:\Codes\Stock_Tracker\gold。
-先运行 python scripts\read_gold_context.py --refresh-market，读取并刷新黄金页面状态、上海黄金交易所 Au99.99、中银上海金ETF联接C（009478）、我的持仓和定投计划。
+先运行 python scripts\read_gold_context.py --refresh-market，读取并刷新黄金页面状态、上海黄金交易所 Au99.99、中银上海金ETF联接C（009478）、我的基金份额持仓和定投计划。
 你自己综合 default_prompt、market、holding_metrics、plan_metrics 和 quote_errors 做谨慎分析，生成符合 write_result_schema 的 JSON。
 建议必须明确今日动作：继续定投、暂缓、逢低补、分批减仓或只观察；写清触发条件、风险点，以及定投金额或频率是否需要调整。
 然后运行 python scripts\write_gold_result.py result.json 写入页面。不要触发 GitHub Actions，不要添加固定结尾套话。

@@ -29,7 +29,7 @@ PROXY_ENV_KEYS = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https
 
 DEFAULT_STATE = {
   "version": 1,
-  "holding": {"grams": 0, "costAmount": 0},
+  "holding": {"shares": 0, "costAmount": 0},
   "plan": {"amount": 0, "frequency": "monthly"},
   "market": {"gold": None, "fund": None, "quoteErrors": [], "refreshedAt": ""},
   "advice": None,
@@ -335,41 +335,70 @@ def monthly_multiplier(value: Any) -> float:
   return {"weekly": 52 / 12, "biweekly": 26 / 12, "monthly": 1}.get(str(value or ""), 1)
 
 
+def fund_move(state: dict[str, Any]) -> dict[str, float | None]:
+  market = state.get("market") if isinstance(state.get("market"), dict) else {}
+  fund = market.get("fund") if isinstance(market.get("fund"), dict) else {}
+  latest_nav = number_or_none(fund.get("nav"))
+  previous_nav = number_or_none(fund.get("previous_nav"))
+  estimated_nav = number_or_none(fund.get("estimated_nav"))
+  stored_amount = number_or_none(fund.get("change_amount"))
+  current_value = latest_nav if stored_amount is not None and latest_nav is not None else estimated_nav or latest_nav
+  change_amount = stored_amount
+  if change_amount is None and current_value is not None and previous_nav is not None:
+    change_amount = current_value - previous_nav
+  change_percent = number_or_none(fund.get("change_percent"))
+  if change_percent is None and change_amount is not None and previous_nav:
+    change_percent = change_amount / previous_nav * 100
+  return {
+    "current_value": current_value,
+    "previous_nav": previous_nav,
+    "change_amount": change_amount,
+    "change_percent": change_percent,
+  }
+
+
+def holding_shares(holding: dict[str, Any]) -> float:
+  shares = number_or_none(holding.get("shares"))
+  if shares is not None:
+    return shares
+  return number_or_none(holding.get("grams")) or 0
+
+
 def holding_metrics(state: dict[str, Any]) -> dict[str, Any]:
   holding = state.get("holding") if isinstance(state.get("holding"), dict) else {}
-  market = state.get("market") if isinstance(state.get("market"), dict) else {}
-  gold = market.get("gold") if isinstance(market.get("gold"), dict) else {}
-  grams = number_or_none(holding.get("grams")) or 0
+  move = fund_move(state)
+  shares = holding_shares(holding)
   cost_amount = number_or_none(holding.get("costAmount")) or 0
-  price = number_or_none(gold.get("price"))
-  previous_close = number_or_none(gold.get("previous_close"))
-  holding_amount = grams * price if price is not None else None
-  daily_profit = grams * (price - previous_close) if price is not None and previous_close is not None else None
+  current_value = move["current_value"]
+  change_amount = move["change_amount"]
+  holding_amount = shares * current_value if current_value is not None else None
+  daily_profit = shares * change_amount if change_amount is not None else None
   holding_profit = holding_amount - cost_amount if holding_amount is not None and cost_amount > 0 else None
   holding_yield = holding_profit / cost_amount * 100 if holding_profit is not None and cost_amount > 0 else None
-  cost_price = cost_amount / grams if grams > 0 and cost_amount > 0 else None
+  cost_nav = cost_amount / shares if shares > 0 and cost_amount > 0 else None
   return {
     "holding_amount": holding_amount,
-    "grams": grams,
+    "shares": shares,
     "cost_amount": cost_amount,
     "daily_profit": daily_profit,
     "holding_profit": holding_profit,
     "holding_yield": holding_yield,
-    "cost_price": cost_price,
+    "cost_nav": cost_nav,
+    "fund_current_value": current_value,
+    "fund_change_amount": change_amount,
+    "fund_change_percent": move["change_percent"],
   }
 
 
 def plan_metrics(state: dict[str, Any]) -> dict[str, Any]:
   plan = state.get("plan") if isinstance(state.get("plan"), dict) else {}
-  market = state.get("market") if isinstance(state.get("market"), dict) else {}
-  gold = market.get("gold") if isinstance(market.get("gold"), dict) else {}
   amount = number_or_none(plan.get("amount")) or 0
-  price = number_or_none(gold.get("price"))
+  current_value = fund_move(state)["current_value"]
   frequency = str(plan.get("frequency") or "monthly")
   return {
     "amount": amount,
     "frequency": frequency_text(frequency),
-    "estimated_grams": amount / price if price and price > 0 else None,
+    "estimated_shares": amount / current_value if current_value and current_value > 0 else None,
     "monthly_budget": amount * monthly_multiplier(frequency),
   }
 
@@ -378,8 +407,8 @@ def build_context(state: dict[str, Any], errors: list[str]) -> dict[str, Any]:
   metrics = holding_metrics(state)
   plan = plan_metrics(state)
   default_prompt = (
-    "请你作为谨慎的黄金持仓助手，根据今日国内黄金行情、009478 中银上海金ETF联接C、"
-    "我的持仓情况和定投计划，生成今日操作建议。建议需要明确今日动作：继续定投、暂缓、逢低补、"
+    "请你作为谨慎的黄金基金持仓助手，根据今日国内黄金行情、009478 中银上海金ETF联接C、"
+    "我的中银上海金ETF联接C持仓份额和定投计划，生成今日操作建议。建议需要明确今日动作：继续定投、暂缓、逢低补、"
     "分批减仓或只观察；说明触发条件、风险点和定投是否调整。不要添加固定套话，不构成投资建议的提示无需重复。"
   )
   return {

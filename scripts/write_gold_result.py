@@ -21,7 +21,7 @@ CHINA_TZ = ZoneInfo("Asia/Shanghai")
 
 DEFAULT_STATE = {
   "version": 1,
-  "holding": {"grams": 0, "costAmount": 0},
+  "holding": {"shares": 0, "costAmount": 0},
   "plan": {"amount": 0, "frequency": "monthly"},
   "market": {"gold": None, "fund": None, "quoteErrors": [], "refreshedAt": ""},
   "advice": None,

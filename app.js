@@ -8,7 +8,7 @@ const FUND_CODE = "009478";
 const DEFAULT_STATE = {
   version: 1,
   holding: {
-    grams: 0,
+    shares: 0,
     costAmount: 0,
   },
   plan: {
@@ -116,10 +116,10 @@ function signedMoney(value) {
   return `${sign}${money(number)}`;
 }
 
-function grams(value) {
+function shares(value) {
   const number = numberOrNull(value);
   if (number === null) return "--";
-  return `${number.toFixed(4).replace(/0+$/u, "").replace(/\.$/u, "")} 克`;
+  return `${number.toFixed(4).replace(/0+$/u, "").replace(/\.$/u, "")} 份`;
 }
 
 function percent(value) {
@@ -236,7 +236,7 @@ async function saveState(successText = "已保存") {
 function applyInputs() {
   const holding = state.data.holding;
   const plan = state.data.plan;
-  els.holdingGramsInput.value = safeNumber(holding.grams) || "";
+  els.holdingGramsInput.value = holdingShares(holding) || "";
   els.costAmountInput.value = safeNumber(holding.costAmount) || "";
   els.planAmountInput.value = safeNumber(plan.amount) || "";
   els.planFrequencyInput.value = plan.frequency || "monthly";
@@ -262,8 +262,8 @@ function setSignedMetric(element, value, formatter = signedMoney) {
   if (number < 0) element.classList.add("loss");
 }
 
-function currentGoldPrice() {
-  return numberOrNull(state.data.market.gold && state.data.market.gold.price);
+function holdingShares(holding = state.data.holding) {
+  return safeNumber(holding && (holding.shares ?? holding.grams));
 }
 
 function fundComparison(fund) {
@@ -279,6 +279,10 @@ function fundComparison(fund) {
   const changePercent =
     storedPercent ?? (changeAmount !== null && previousNav ? (changeAmount / previousNav) * 100 : null);
   return { currentValue, previousNav, changeAmount, changePercent };
+}
+
+function currentFundMove() {
+  return fundComparison(state.data.market.fund || {});
 }
 
 function renderMarket() {
@@ -318,24 +322,24 @@ function renderMarket() {
 
 function holdingMetrics() {
   const holding = state.data.holding || {};
-  const gramsValue = safeNumber(holding.grams);
+  const shareValue = holdingShares(holding);
   const costAmount = safeNumber(holding.costAmount);
-  const price = currentGoldPrice();
-  const previousClose = numberOrNull(state.data.market.gold && state.data.market.gold.previous_close);
-  const holdingAmount = price === null ? null : gramsValue * price;
-  const dailyProfit = price === null || previousClose === null ? null : gramsValue * (price - previousClose);
+  const fundMove = currentFundMove();
+  const fundValue = fundMove.currentValue;
+  const holdingAmount = fundValue === null ? null : shareValue * fundValue;
+  const dailyProfit = fundMove.changeAmount === null ? null : shareValue * fundMove.changeAmount;
   const holdingProfit = holdingAmount === null || costAmount <= 0 ? null : holdingAmount - costAmount;
   const holdingYield = holdingProfit === null || costAmount <= 0 ? null : (holdingProfit / costAmount) * 100;
-  const costPrice = gramsValue > 0 && costAmount > 0 ? costAmount / gramsValue : null;
+  const costNav = shareValue > 0 && costAmount > 0 ? costAmount / shareValue : null;
 
   return {
-    gramsValue,
+    shareValue,
     costAmount,
     holdingAmount,
     dailyProfit,
     holdingProfit,
     holdingYield,
-    costPrice,
+    costNav,
   };
 }
 
@@ -358,21 +362,21 @@ function monthlyMultiplier(value) {
 function renderPortfolio() {
   const metrics = holdingMetrics();
   const plan = state.data.plan || {};
-  const price = currentGoldPrice();
+  const fundValue = currentFundMove().currentValue;
   const planAmount = safeNumber(plan.amount);
-  const estimatedGrams = price === null || price <= 0 ? null : planAmount / price;
+  const estimatedShares = fundValue === null || fundValue <= 0 ? null : planAmount / fundValue;
   const monthlyBudget = planAmount * monthlyMultiplier(plan.frequency);
 
   els.holdingAmount.textContent = metrics.holdingAmount === null ? "--" : `¥${money(metrics.holdingAmount)}`;
-  els.holdingGrams.textContent = grams(metrics.gramsValue);
+  els.holdingGrams.textContent = shares(metrics.shareValue);
   setSignedMetric(els.dailyProfit, metrics.dailyProfit);
   setSignedMetric(els.holdingProfit, metrics.holdingProfit);
   setSignedMetric(els.holdingYield, metrics.holdingYield, percent);
-  els.costPrice.textContent = metrics.costPrice === null ? "--" : `${money(metrics.costPrice)} 元/克`;
+  els.costPrice.textContent = metrics.costNav === null ? "--" : `${money(metrics.costNav, 4)} 元/份`;
 
   els.planAmount.textContent = `¥${money(planAmount)}`;
   els.planFrequency.textContent = frequencyText(plan.frequency);
-  els.planEstimatedGrams.textContent = estimatedGrams === null ? "--" : grams(estimatedGrams);
+  els.planEstimatedGrams.textContent = estimatedShares === null ? "--" : shares(estimatedShares);
   els.planMonthlyBudget.textContent = `¥${money(monthlyBudget)}`;
 }
 
@@ -423,7 +427,7 @@ function render() {
 function updateHoldingFromInputs() {
   state.data.holding = {
     ...state.data.holding,
-    grams: safeNumber(els.holdingGramsInput.value),
+    shares: safeNumber(els.holdingGramsInput.value),
     costAmount: safeNumber(els.costAmountInput.value),
     updatedAt: chinaNow().toISOString(),
   };
